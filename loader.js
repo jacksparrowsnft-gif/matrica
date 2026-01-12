@@ -179,8 +179,7 @@
     closeBtn.id = 'widget-close';
     closeBtn.innerHTML = '×';
     closeBtn.onclick = function() {
-      document.getElementById('widget-backdrop').remove();
-      document.getElementById('widget-container').remove();
+      closeWidget();
     };
     
     var header = document.createElement('div');
@@ -241,25 +240,80 @@
     backdrop.id = 'widget-backdrop';
     backdrop.onclick = function(e) {
       if (e.target === backdrop) {
-        backdrop.remove();
-        document.getElementById('widget-container').remove();
+        closeWidget();
       }
     };
     return backdrop;
   }
   
+  function closeWidget() {
+    var backdrop = document.getElementById('widget-backdrop');
+    var container = document.getElementById('widget-container');
+    if (backdrop) backdrop.remove();
+    if (container) container.remove();
+  }
+  
+  function openWidget() {
+    // Don't open if already open
+    if (document.getElementById('widget-container')) return;
+    
+    var backdrop = createBackdrop();
+    var widget = createWidget();
+    
+    document.body.appendChild(backdrop);
+    document.body.appendChild(widget);
+  }
+  
+  function attachButtonListeners() {
+    // Try multiple selectors to find the buttons
+    var selectors = [
+      'button',           // All buttons
+      '[role="button"]',  // Elements with button role
+      'a.button',         // Links styled as buttons
+      '.btn',             // Common button class
+      '[onclick]',
+    ];
+    
+    selectors.forEach(function(selector) {
+      var elements = document.querySelectorAll(selector);
+      
+      elements.forEach(function(el) {
+        // Skip if already has our listener
+        if (el.hasAttribute('data-matrica-listener')) return;
+        
+        var text = el.textContent.trim().toLowerCase();
+        var hasPhantom = text.includes('phantom');
+        var hasNetwork = text.includes('select') && text.includes('network');
+        var hasLogin = text.includes('login');
+        
+        if (hasPhantom || hasNetwork || hasLogin) {
+          el.setAttribute('data-matrica-listener', 'true');
+          el.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openWidget();
+          });
+          console.log('Matrica: Attached listener to', text);
+        }
+      });
+    });
+  }
+  
   function init() {
     injectStyles();
     
-    document.addEventListener('click', function() {
-      if (document.getElementById('widget-container')) return;
-      
-      var backdrop = createBackdrop();
-      var widget = createWidget();
-      
-      document.body.appendChild(backdrop);
-      document.body.appendChild(widget);
-    }, { once: true });
+    // Try to attach listeners immediately
+    attachButtonListeners();
+    
+    // Also observe DOM changes in case buttons load dynamically
+    var observer = new MutationObserver(function() {
+      attachButtonListeners();
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
   
   if (document.readyState === 'loading') {
@@ -267,4 +321,7 @@
   } else {
     init();
   }
+  
+  // Expose openWidget globally in case you need to trigger it manually
+  window.openMatricaWidget = openWidget;
 })();
